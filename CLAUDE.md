@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## WhatsApp Manager - Laravel Application
 
-This is a Laravel 12 application that manages WhatsApp Web Multi-Device containers through Docker, providing a Filament admin panel and API proxy system.
+This is a Laravel 12 application that manages WhatsApp Web Multi-Device containers through Docker, providing a Filament admin panel and API proxy system. The goal is to evolve this into a comprehensive WhatsApp Business API service that can compete with services like Green API.
+
+## Project Vision
+
+**Current State**: Container management system for WhatsApp Web instances
+**Target Goal**: Complete WhatsApp Business API service with developer-friendly features
+**Competitive Focus**: Replace Green API with better pricing, documentation, and developer experience
 
 ## Common Development Commands
 
@@ -91,9 +97,37 @@ Client Request → Laravel App → WhatsAppProxyMiddleware → Docker Container 
 - `POST /api/whatsapp/{id}/stop` - Stop instance
 - `GET /api/whatsapp/{id}/status` - Get status
 
-### WhatsApp API Proxy
+### WhatsApp API Proxy (Current)
 - `/api/instance/{id}/*` - Forwards all calls to WhatsApp container on port 300X
 - Example: `/api/instance/1/send/message` → `http://localhost:3001/send/message`
+
+### Planned WhatsApp API Endpoints
+**Authentication & Session Management**
+- `POST /api/whatsapp/{id}/login` - Generate QR code or pairing code
+- `POST /api/whatsapp/{id}/logout` - Disconnect from WhatsApp
+- `GET /api/whatsapp/{id}/status` - Get connection status
+- `POST /api/whatsapp/{id}/reconnect` - Reconnect to WhatsApp
+
+**Message Operations**
+- `POST /api/whatsapp/{id}/send/text` - Send text message
+- `POST /api/whatsapp/{id}/send/image` - Send image with caption
+- `POST /api/whatsapp/{id}/send/file` - Send document/file
+- `POST /api/whatsapp/{id}/send/audio` - Send audio message
+- `POST /api/whatsapp/{id}/send/video` - Send video message
+- `POST /api/whatsapp/{id}/send/location` - Send location
+- `POST /api/whatsapp/{id}/send/poll` - Send poll message
+- `GET /api/whatsapp/{id}/messages` - Get message history
+
+**Contact & Group Management**
+- `GET /api/whatsapp/{id}/contacts` - List contacts
+- `POST /api/whatsapp/{id}/contacts/check` - Validate phone number
+- `GET /api/whatsapp/{id}/groups` - List groups
+- `POST /api/whatsapp/{id}/groups` - Create group
+- `POST /api/whatsapp/{id}/groups/{groupId}/participants` - Add/remove participants
+
+**Webhook Configuration**
+- `POST /api/whatsapp/{id}/webhooks` - Configure webhook URL
+- `GET /api/whatsapp/{id}/webhooks` - Get webhook settings
 
 ## Docker Configuration
 
@@ -102,6 +136,15 @@ Client Request → Laravel App → WhatsAppProxyMiddleware → Docker Container 
 - **Port Range**: 3000-3100 (allocated dynamically)
 - **Container Names**: `whatsapp-{instance_id}`
 - **Environment**: Webhook URL configurable per instance
+
+### Container API Capabilities
+The WhatsApp containers provide a complete REST API (v6.0.0) with these endpoint groups:
+- **App Endpoints**: Login/logout, pairing codes, device management
+- **User Endpoints**: Profile info, avatar, privacy settings, contacts/groups
+- **Send Endpoints**: Text, images, audio, files, videos, contacts, links, locations, polls
+- **Message Endpoints**: Revoke, react, edit, mark as read, star messages
+- **Group Endpoints**: Create/manage groups, participants, permissions
+- **Webhook Support**: Real-time message notifications
 
 ### Requirements
 - Docker socket access: `/var/run/docker.sock:/var/run/docker.sock`
