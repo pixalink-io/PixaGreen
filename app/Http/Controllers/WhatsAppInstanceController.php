@@ -9,13 +9,12 @@ use Illuminate\Http\Request;
 
 class WhatsAppInstanceController extends Controller
 {
-    public function __construct(private DockerService $dockerService)
-    {
-    }
+    public function __construct(private DockerService $dockerService) {}
 
     public function index(): JsonResponse
     {
         $instances = WhatsAppInstance::all();
+
         return response()->json($instances);
     }
 
@@ -23,27 +22,27 @@ class WhatsAppInstanceController extends Controller
     {
         $request->validate([
             'name' => ['required', 'string', 'unique:whatsapp_instances'],
-            'webhook_url' => ['nullable', 'url']
+            'webhook_url' => ['nullable', 'url'],
         ]);
 
         try {
             $instance = WhatsAppInstance::create([
                 'name' => $request->name,
                 'webhook_url' => $request->webhook_url,
-                'status' => 'creating'
+                'status' => 'creating',
             ]);
 
             $containerInfo = $this->dockerService->createContainer($instance);
 
             return response()->json([
                 'instance' => $instance->fresh(),
-                'container' => $containerInfo
+                'container' => $containerInfo,
             ], 201);
 
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to create instance',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -56,8 +55,8 @@ class WhatsAppInstanceController extends Controller
     public function update(Request $request, WhatsAppInstance $instance): JsonResponse
     {
         $request->validate([
-            'name' => ['sometimes', 'string', 'unique:whatsapp_instances,name,' . $instance->id],
-            'webhook_url' => ['nullable', 'url']
+            'name' => ['sometimes', 'string', 'unique:whatsapp_instances,name,'.$instance->id],
+            'webhook_url' => ['nullable', 'url'],
         ]);
 
         $instance->update($request->only(['name', 'webhook_url']));
@@ -76,7 +75,7 @@ class WhatsAppInstanceController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to delete instance',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -95,7 +94,7 @@ class WhatsAppInstanceController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to start instance',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -114,7 +113,7 @@ class WhatsAppInstanceController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to stop instance',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -129,7 +128,7 @@ class WhatsAppInstanceController extends Controller
             'docker_status' => $dockerStatus,
             'is_healthy' => $isHealthy,
             'api_url' => $instance->getApiUrl(),
-            'last_activity' => $instance->last_activity
+            'last_activity' => $instance->last_activity,
         ]);
     }
 }

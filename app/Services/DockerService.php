@@ -3,37 +3,42 @@
 namespace App\Services;
 
 use App\Models\WhatsAppInstance;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Process;
 
 class DockerService
 {
     private const IMAGE = 'aldinokemal2104/go-whatsapp-web-multidevice:latest';
+
     private const PORT_RANGE_START = 3000;
+
     private const PORT_RANGE_END = 3100;
 
     public function createContainer(WhatsAppInstance $instance): array
     {
         $this->validateDockerEnvironment();
-        
+
         $containerName = "whatsapp-{$instance->id}";
         $port = $this->getAvailablePort();
+
+        $dbUri = $this->getPostgresDbUri($instance);
 
         $command = [
             'docker', 'run',
             '-d',
             '--name', $containerName,
             '-p', "{$port}:3000",
-            '-e', 'WEBHOOK=' . ($instance->webhook_url ?? ''),
-            self::IMAGE
+            '-e', 'WHATSAPP_WEBHOOK='.($instance->webhook_url ?? ''),
+            '-e', 'WHATSAPP_WEBHOOK_SECRET='.($instance->webhook_secret ?? 'secret'),
+            '-e', 'DB_URI='.$dbUri,
+            self::IMAGE,
         ];
 
         $result = Process::run($command);
 
         if ($result->failed()) {
-            Log::error("Failed to create container for instance {$instance->id}: " . $result->errorOutput());
-            throw new \Exception("Failed to create container: " . $result->errorOutput());
+            Log::error("Failed to create container for instance {$instance->id}: ".$result->errorOutput());
+            throw new \Exception('Failed to create container: '.$result->errorOutput());
         }
 
         $containerId = trim($result->output());
@@ -41,7 +46,7 @@ class DockerService
         $instance->update([
             'container_id' => $containerId,
             'port' => $port,
-            'status' => 'running'
+            'status' => 'running',
         ]);
 
         Log::info("Created container {$containerName} for instance {$instance->id} on port {$port}");
@@ -49,13 +54,13 @@ class DockerService
         return [
             'container_id' => $containerId,
             'port' => $port,
-            'name' => $containerName
+            'name' => $containerName,
         ];
     }
 
     public function stopContainer(WhatsAppInstance $instance): bool
     {
-        if (!$instance->container_id) {
+        if (! $instance->container_id) {
             return false;
         }
 
@@ -63,6 +68,7 @@ class DockerService
 
         if ($result->successful()) {
             $instance->update(['status' => 'stopped']);
+
             return true;
         }
 
@@ -71,12 +77,13 @@ class DockerService
 
     public function startContainer(WhatsAppInstance $instance): bool
     {
-        if (!$instance->container_id) {
+        if (! $instance->container_id) {
             return false;
         }
 
-        if (!$this->isDockerRunning()) {
-            Log::error("Cannot start container: Docker daemon is not running");
+        if (! $this->isDockerRunning()) {
+            Log::error('Cannot start container: Docker daemon is not running');
+
             return false;
         }
 
@@ -85,16 +92,18 @@ class DockerService
         if ($result->successful()) {
             $instance->update(['status' => 'running']);
             Log::info("Started container for instance {$instance->id}");
+
             return true;
         }
 
-        Log::error("Failed to start container for instance {$instance->id}: " . $result->errorOutput());
+        Log::error("Failed to start container for instance {$instance->id}: ".$result->errorOutput());
+
         return false;
     }
 
     public function removeContainer(WhatsAppInstance $instance): bool
     {
-        if (!$instance->container_id) {
+        if (! $instance->container_id) {
             return false;
         }
 
@@ -104,8 +113,9 @@ class DockerService
         if ($result->successful()) {
             $instance->update([
                 'container_id' => null,
-                'status' => 'stopped'
+                'status' => 'stopped',
             ]);
+
             return true;
         }
 
@@ -114,18 +124,18 @@ class DockerService
 
     public function getContainerStatus(WhatsAppInstance $instance): string
     {
-        if (!$instance->container_id) {
+        if (! $instance->container_id) {
             return 'not_created';
         }
 
-        if (!$this->isDockerRunning()) {
+        if (! $this->isDockerRunning()) {
             return 'docker_unavailable';
         }
 
         $result = Process::run([
             'docker', 'inspect',
             '--format', '{{.State.Status}}',
-            $instance->container_id
+            $instance->container_id,
         ]);
 
         if ($result->failed()) {
@@ -138,7 +148,8 @@ class DockerService
     public function isContainerHealthy(WhatsAppInstance $instance): bool
     {
         try {
-            $response = file_get_contents($instance->getApiUrl() . '/api/health');
+            $response = file_get_contents($instance->getApiUrl().'/api/health');
+
             return $response !== false;
         } catch (\Exception $e) {
             return false;
@@ -150,7 +161,7 @@ class DockerService
         $usedPorts = WhatsAppInstance::whereNotNull('port')->pluck('port')->toArray();
 
         for ($port = self::PORT_RANGE_START; $port <= self::PORT_RANGE_END; $port++) {
-            if (!in_array($port, $usedPorts) && !$this->isPortInUse($port)) {
+            if (! in_array($port, $usedPorts) && ! $this->isPortInUse($port)) {
                 return $port;
             }
         }
@@ -163,8 +174,10 @@ class DockerService
         $connection = @fsockopen('localhost', $port);
         if ($connection) {
             fclose($connection);
+
             return true;
         }
+
         return false;
     }
 
@@ -174,6 +187,7 @@ class DockerService
     public function isDockerRunning(): bool
     {
         $result = Process::run(['docker', 'info']);
+
         return $result->successful();
     }
 
@@ -183,7 +197,8 @@ class DockerService
     public function isImageAvailable(): bool
     {
         $result = Process::run(['docker', 'images', '-q', self::IMAGE]);
-        return $result->successful() && !empty(trim($result->output()));
+
+        return $result->successful() && ! empty(trim($result->output()));
     }
 
     /**
@@ -195,15 +210,17 @@ class DockerService
             return true;
         }
 
-        Log::info("Pulling WhatsApp image: " . self::IMAGE);
+        Log::info('Pulling WhatsApp image: '.self::IMAGE);
         $result = Process::run(['docker', 'pull', self::IMAGE]);
-        
+
         if ($result->failed()) {
-            Log::error("Failed to pull image " . self::IMAGE . ": " . $result->errorOutput());
+            Log::error('Failed to pull image '.self::IMAGE.': '.$result->errorOutput());
+
             return false;
         }
 
-        Log::info("Successfully pulled image: " . self::IMAGE);
+        Log::info('Successfully pulled image: '.self::IMAGE);
+
         return true;
     }
 
@@ -212,23 +229,40 @@ class DockerService
      */
     public function validateDockerEnvironment(): void
     {
-        if (!$this->isDockerRunning()) {
+        if (! $this->isDockerRunning()) {
             throw new \Exception(
-                "Docker daemon is not running. Please start Docker service:\n" .
-                "- On Linux/macOS: sudo systemctl start docker or start Docker Desktop\n" .
-                "- On Windows: Start Docker Desktop\n" .
-                "- Verify with: docker info"
+                "Docker daemon is not running. Please start Docker service:\n".
+                "- On Linux/macOS: sudo systemctl start docker or start Docker Desktop\n".
+                "- On Windows: Start Docker Desktop\n".
+                '- Verify with: docker info'
             );
         }
 
-        if (!$this->pullImageIfMissing()) {
+        if (! $this->pullImageIfMissing()) {
             throw new \Exception(
-                "Failed to ensure WhatsApp image is available. Please check:\n" .
-                "- Internet connection for pulling image\n" .
-                "- Docker Hub accessibility\n" .
-                "- Manual pull: docker pull " . self::IMAGE
+                "Failed to ensure WhatsApp image is available. Please check:\n".
+                "- Internet connection for pulling image\n".
+                "- Docker Hub accessibility\n".
+                '- Manual pull: docker pull '.self::IMAGE
             );
         }
+    }
+
+    /**
+     * Generate PostgresSQL DB URI for WhatsApp container
+     */
+    private function getPostgresDbUri(WhatsAppInstance $instance): string
+    {
+        $host = config('database.connections.pgsql.host', '127.0.0.1');
+        $port = config('database.connections.pgsql.port', '5432');
+        $database = config('database.connections.pgsql.database', 'laravel');
+        $username = config('database.connections.pgsql.username', 'root');
+        $password = config('database.connections.pgsql.password', '');
+
+        // Create a unique database name for each instance
+        $instanceDb = $database.'_wa_'.$instance->id;
+
+        return "postgres://{$username}:{$password}@{$host}:{$port}/{$instanceDb}";
     }
 
     /**
@@ -240,7 +274,7 @@ class DockerService
             'docker_running' => $this->isDockerRunning(),
             'image_available' => $this->isImageAvailable(),
             'image_name' => self::IMAGE,
-            'port_range' => self::PORT_RANGE_START . '-' . self::PORT_RANGE_END,
+            'port_range' => self::PORT_RANGE_START.'-'.self::PORT_RANGE_END,
         ];
     }
 }

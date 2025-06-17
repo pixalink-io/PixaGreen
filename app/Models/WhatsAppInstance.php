@@ -6,13 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class WhatsAppInstance extends Model
 {
-    protected $table='whatsapp_instances';
+    protected $table = 'whatsapp_instances';
+
     protected $fillable = [
         'name',
         'container_id',
         'port',
         'status',
         'webhook_url',
+        'webhook_secret',
         'config',
         'last_activity',
     ];

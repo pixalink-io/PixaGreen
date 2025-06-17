@@ -3,22 +3,21 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\WhatsAppInstanceResource\Pages;
-use App\Filament\Resources\WhatsAppInstanceResource\RelationManagers;
 use App\Models\WhatsAppInstance;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class WhatsAppInstanceResource extends Resource
 {
     protected static ?string $model = WhatsAppInstance::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-chat-bubble-left-right';
+
     protected static ?string $navigationLabel = 'WhatsApp Instances';
+
     protected static ?string $modelLabel = 'WhatsApp Instance';
 
     public static function form(Form $form): Form
@@ -29,12 +28,12 @@ class WhatsAppInstanceResource extends Resource
                     ->required()
                     ->maxLength(255)
                     ->unique(ignoreRecord: true),
-                
+
                 Forms\Components\TextInput::make('webhook_url')
                     ->url()
                     ->maxLength(255)
                     ->label('Webhook URL'),
-                
+
                 Forms\Components\Select::make('status')
                     ->options([
                         'creating' => 'Creating',
@@ -44,11 +43,11 @@ class WhatsAppInstanceResource extends Resource
                     ])
                     ->disabled()
                     ->default('creating'),
-                
+
                 Forms\Components\TextInput::make('port')
                     ->numeric()
                     ->disabled(),
-                
+
                 Forms\Components\TextInput::make('container_id')
                     ->disabled()
                     ->label('Container ID'),
@@ -62,7 +61,7 @@ class WhatsAppInstanceResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                
+
                 Tables\Columns\BadgeColumn::make('status')
                     ->colors([
                         'warning' => 'creating',
@@ -70,15 +69,15 @@ class WhatsAppInstanceResource extends Resource
                         'danger' => 'error',
                         'secondary' => 'stopped',
                     ]),
-                
+
                 Tables\Columns\TextColumn::make('port')
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('last_activity')
                     ->dateTime()
                     ->sortable()
                     ->label('Last Activity'),
-                
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -101,7 +100,7 @@ class WhatsAppInstanceResource extends Resource
                     ->action(function (WhatsAppInstance $record) {
                         app(\App\Services\DockerService::class)->startContainer($record);
                     }),
-                
+
                 Tables\Actions\Action::make('stop')
                     ->icon('heroicon-o-stop')
                     ->color('danger')
@@ -109,13 +108,13 @@ class WhatsAppInstanceResource extends Resource
                     ->action(function (WhatsAppInstance $record) {
                         app(\App\Services\DockerService::class)->stopContainer($record);
                     }),
-                
+
                 Tables\Actions\Action::make('view_api')
                     ->icon('heroicon-o-link')
                     ->url(fn (WhatsAppInstance $record) => $record->getApiUrl())
                     ->openUrlInNewTab()
                     ->visible(fn (WhatsAppInstance $record) => $record->isRunning()),
-                
+
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
