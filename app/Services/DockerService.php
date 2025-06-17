@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\WhatsAppInstance;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class DockerService
@@ -14,6 +15,8 @@ class DockerService
 
     public function createContainer(WhatsAppInstance $instance): array
     {
+        $this->validateDockerEnvironment();
+        
         $containerName = "whatsapp-{$instance->id}";
         $port = $this->getAvailablePort();
 
@@ -29,6 +32,7 @@ class DockerService
         $result = Process::run($command);
 
         if ($result->failed()) {
+            Log::error("Failed to create container for instance {$instance->id}: " . $result->errorOutput());
             throw new \Exception("Failed to create container: " . $result->errorOutput());
         }
 
@@ -39,6 +43,8 @@ class DockerService
             'port' => $port,
             'status' => 'running'
         ]);
+
+        Log::info("Created container {$containerName} for instance {$instance->id} on port {$port}");
 
         return [
             'container_id' => $containerId,
@@ -69,13 +75,20 @@ class DockerService
             return false;
         }
 
+        if (!$this->isDockerRunning()) {
+            Log::error("Cannot start container: Docker daemon is not running");
+            return false;
+        }
+
         $result = Process::run(['docker', 'start', $instance->container_id]);
 
         if ($result->successful()) {
             $instance->update(['status' => 'running']);
+            Log::info("Started container for instance {$instance->id}");
             return true;
         }
 
+        Log::error("Failed to start container for instance {$instance->id}: " . $result->errorOutput());
         return false;
     }
 
@@ -103,6 +116,10 @@ class DockerService
     {
         if (!$instance->container_id) {
             return 'not_created';
+        }
+
+        if (!$this->isDockerRunning()) {
+            return 'docker_unavailable';
         }
 
         $result = Process::run([
@@ -149,5 +166,81 @@ class DockerService
             return true;
         }
         return false;
+    }
+
+    /**
+     * Check if Docker daemon is running and accessible
+     */
+    public function isDockerRunning(): bool
+    {
+        $result = Process::run(['docker', 'info']);
+        return $result->successful();
+    }
+
+    /**
+     * Check if the WhatsApp image is available locally
+     */
+    public function isImageAvailable(): bool
+    {
+        $result = Process::run(['docker', 'images', '-q', self::IMAGE]);
+        return $result->successful() && !empty(trim($result->output()));
+    }
+
+    /**
+     * Pull the WhatsApp image if it's not available locally
+     */
+    public function pullImageIfMissing(): bool
+    {
+        if ($this->isImageAvailable()) {
+            return true;
+        }
+
+        Log::info("Pulling WhatsApp image: " . self::IMAGE);
+        $result = Process::run(['docker', 'pull', self::IMAGE]);
+        
+        if ($result->failed()) {
+            Log::error("Failed to pull image " . self::IMAGE . ": " . $result->errorOutput());
+            return false;
+        }
+
+        Log::info("Successfully pulled image: " . self::IMAGE);
+        return true;
+    }
+
+    /**
+     * Validate that Docker environment is ready for operations
+     */
+    public function validateDockerEnvironment(): void
+    {
+        if (!$this->isDockerRunning()) {
+            throw new \Exception(
+                "Docker daemon is not running. Please start Docker service:\n" .
+                "- On Linux/macOS: sudo systemctl start docker or start Docker Desktop\n" .
+                "- On Windows: Start Docker Desktop\n" .
+                "- Verify with: docker info"
+            );
+        }
+
+        if (!$this->pullImageIfMissing()) {
+            throw new \Exception(
+                "Failed to ensure WhatsApp image is available. Please check:\n" .
+                "- Internet connection for pulling image\n" .
+                "- Docker Hub accessibility\n" .
+                "- Manual pull: docker pull " . self::IMAGE
+            );
+        }
+    }
+
+    /**
+     * Get comprehensive Docker environment status
+     */
+    public function getDockerStatus(): array
+    {
+        return [
+            'docker_running' => $this->isDockerRunning(),
+            'image_available' => $this->isImageAvailable(),
+            'image_name' => self::IMAGE,
+            'port_range' => self::PORT_RANGE_START . '-' . self::PORT_RANGE_END,
+        ];
     }
 }

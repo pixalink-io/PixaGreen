@@ -27,6 +27,9 @@ composer test
 
 ### WhatsApp Instance Management
 ```bash
+# Check Docker daemon and image status
+php artisan whatsapp:check-docker
+
 # Sync container status with database
 php artisan whatsapp:sync-status
 
@@ -66,12 +69,15 @@ Client Request → Laravel App → WhatsAppProxyMiddleware → Docker Container 
   - Container creation/start/stop/removal
   - Port allocation (3000-3100 range)
   - Health checks and status monitoring
+  - Docker daemon validation and image management
+  - Automatic WhatsApp image pulling
 
 #### Middleware
 - **WhatsAppProxyMiddleware** (`app/Http/Middleware/WhatsAppProxyMiddleware.php`): Routes `/api/instance/{id}/*` calls to container ports
 
 #### Commands
 - **SyncContainerStatus** (`app/Console/Commands/SyncContainerStatus.php`): Monitors container health and syncs database status
+- **CheckDockerStatus** (`app/Console/Commands/CheckDockerStatus.php`): Validates Docker environment and image availability
 
 #### Filament Resources
 - **WhatsAppInstanceResource** (`app/Filament/Resources/WhatsAppInstanceResource.php`): Admin panel interface for instance management
@@ -121,6 +127,7 @@ Client Request → Laravel App → WhatsAppProxyMiddleware → Docker Container 
 - `stopped` - Container stopped
 - `creating` - Container being created
 - `error` - Container failed or unhealthy
+- `docker_unavailable` - Docker daemon not accessible
 
 ### Port Management
 - DockerService automatically finds available ports in 3000-3100 range
