@@ -26,12 +26,15 @@ class WhatsAppInstanceController extends Controller
         ]);
 
         try {
+            // First create the instance with a placeholder port to satisfy DB constraints
             $instance = WhatsAppInstance::create([
                 'name' => $request->name,
                 'webhook_url' => $request->webhook_url,
                 'status' => 'creating',
+                'port' => 0, // Temporary value to satisfy constraint
             ]);
 
+            // Then create the container
             $containerInfo = $this->dockerService->createContainer($instance);
 
             return response()->json([
