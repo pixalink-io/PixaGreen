@@ -101,7 +101,7 @@ describe('CheckDockerStatus Command', function () {
 
     it('attempts to start docker on macos when --start flag is used', function () {
         $this->markTestSkipped('Skipping this test temporarily');
-        
+
         // Mock the OS as Darwin (macOS)
         if (PHP_OS_FAMILY !== 'Darwin') {
             $this->markTestSkipped('This test only runs on macOS');

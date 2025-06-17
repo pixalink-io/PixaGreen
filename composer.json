@@ -58,6 +58,10 @@
         "test": [
             "@php artisan config:clear --ansi",
             "./vendor/bin/pest"
+        ],
+        "coverage": [
+            "@php artisan config:clear --ansi",
+            "./vendor/bin/pest --coverage-html=coverage-html"
         ]
     },
     "extra": {
